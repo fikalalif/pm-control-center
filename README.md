@@ -15,6 +15,7 @@ This project is built using the modern monolithic SPA approach:
 - **Database:** MySQL
 
 ## 📦 Core Modules
+
 - **Dashboard:** Interactive KPIs and Bento Box widgets.
 - **Project Management:** Projects, Tasks, Milestones, Risks, Issues, and Change Requests.
 - **Stakeholders:** Clients, Vendors, and Internal Team Management.
@@ -27,6 +28,7 @@ This project is built using the modern monolithic SPA approach:
 Follow these instructions to clone, set up, and run the project on your local machine for development.
 
 ### Prerequisites
+
 Make sure you have the following installed on your system:
 - **PHP** >= 8.2
 - **Composer**
@@ -37,57 +39,81 @@ Make sure you have the following installed on your system:
 ### Step-by-Step Installation
 
 **1. Clone the Repository**
+
 ```bash
-git clone [https://github.com/your-username/pm-control-center.git](https://github.com/your-username/pm-control-center.git)
+git clone https://github.com/fikalalif/pm-control-center.git
 cd pm-control-center
+```
 
-2. Install PHP Dependencies
+**2. Install PHP Dependencies**
 
-Bash
+```bash
 composer install
-3. Install Frontend Dependencies
+```
 
-Bash
+**3. Install Frontend Dependencies**
+
+```bash
 npm install
-4. Set Up Environment Variables
-Duplicate the .env.example file to create your local .env configuration.
+```
 
-Bash
+**4. Set Up Environment Variables**
+
+Duplicate the `.env.example` file to create your local `.env` configuration.
+
+```bash
 cp .env.example .env
-Open the .env file and update your database credentials:
+```
 
-Cuplikan kode
+Open the `.env` file and update your database credentials:
+
+```env
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_DATABASE=pm_control_center
 DB_USERNAME=root
 DB_PASSWORD=your_password
-5. Generate Application Key
+```
 
-Bash
+**5. Generate Application Key**
+
+```bash
 php artisan key:generate
-6. Run Migrations & Seeders
+```
+
+**6. Run Migrations & Seeders**
+
 This project includes a comprehensive relational seeder to populate the database with realistic test data (Projects, Users, Tasks, Risks, etc.).
 
-Bash
+```bash
 php artisan migrate:fresh --seed
-7. Start the Development Servers
-Since this is a Laravel + Inertia.js project, you need to run two terminal instances simultaneously.
+```
 
-Terminal 1 (Backend - PHP):
+**7. Start the Development Servers**
 
-Bash
+Since this is a Laravel + Inertia.js project, you need to run **two** terminal instances simultaneously.
+
+**Terminal 1 (Backend - PHP):**
+
+```bash
 php artisan serve
-Terminal 2 (Frontend - Vite/Vue):
+```
 
-Bash
+**Terminal 2 (Frontend - Vite/Vue):**
+
+```bash
 npm run dev
-Your application is now live! Open your browser and visit: http://localhost:8000
+```
 
-💡 Development Notes
-Ziggy Routes: If you add new routes in routes/web.php and they do not reflect in the Vue components (e.g., Inertia <Link> fails), clear the route cache:
+Your application is now live! Open your browser and visit: `http://localhost:8000`
 
-Bash
-php artisan optimize:clear
-Case Sensitivity: This project is developed on an Ubuntu (Linux) environment. Ensure your Vue component filenames and paths perfectly match the casing defined in Inertia::render() (e.g., ChangeRequests vs changeRequests).
+---
+
+## 💡 Development Notes
+
+- **Ziggy Routes:** If you add new routes in `routes/web.php` and they do not reflect in the Vue components (e.g., Inertia `<Link>` fails), clear the route cache:
+  ```bash
+  php artisan optimize:clear
+  ```
+- **Case Sensitivity:** This project is developed on an Ubuntu (Linux) environment. Ensure your Vue component filenames and paths perfectly match the casing defined in `Inertia::render()` (e.g., `ChangeRequests` vs `changeRequests`).
