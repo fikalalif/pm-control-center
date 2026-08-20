@@ -40,3 +40,54 @@ Make sure you have the following installed on your system:
 ```bash
 git clone [https://github.com/your-username/pm-control-center.git](https://github.com/your-username/pm-control-center.git)
 cd pm-control-center
+
+2. Install PHP Dependencies
+
+Bash
+composer install
+3. Install Frontend Dependencies
+
+Bash
+npm install
+4. Set Up Environment Variables
+Duplicate the .env.example file to create your local .env configuration.
+
+Bash
+cp .env.example .env
+Open the .env file and update your database credentials:
+
+Cuplikan kode
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=pm_control_center
+DB_USERNAME=root
+DB_PASSWORD=your_password
+5. Generate Application Key
+
+Bash
+php artisan key:generate
+6. Run Migrations & Seeders
+This project includes a comprehensive relational seeder to populate the database with realistic test data (Projects, Users, Tasks, Risks, etc.).
+
+Bash
+php artisan migrate:fresh --seed
+7. Start the Development Servers
+Since this is a Laravel + Inertia.js project, you need to run two terminal instances simultaneously.
+
+Terminal 1 (Backend - PHP):
+
+Bash
+php artisan serve
+Terminal 2 (Frontend - Vite/Vue):
+
+Bash
+npm run dev
+Your application is now live! Open your browser and visit: http://localhost:8000
+
+💡 Development Notes
+Ziggy Routes: If you add new routes in routes/web.php and they do not reflect in the Vue components (e.g., Inertia <Link> fails), clear the route cache:
+
+Bash
+php artisan optimize:clear
+Case Sensitivity: This project is developed on an Ubuntu (Linux) environment. Ensure your Vue component filenames and paths perfectly match the casing defined in Inertia::render() (e.g., ChangeRequests vs changeRequests).
