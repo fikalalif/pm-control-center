@@ -33,8 +33,11 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'auth' => [
                 'user' => $request->user(),
-                'notifications' => $request->user() ? $request->user()->unreadNotifications()->take(5)->get() : [],
-                'unread_notifications_count' => $request->user() ? $request->user()->unreadNotifications()->count() : 0,
+            ],
+            'flash' => [
+                'message' => fn() => $request->session()->get('message'),
+                // Tambahkan baris ini biar pesan error dari controller bisa nyebrang ke Vue
+                'error' => fn() => $request->session()->get('error'),
             ],
         ];
     }

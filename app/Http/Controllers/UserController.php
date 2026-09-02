@@ -37,13 +37,25 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        // Cegah user menghapus dirinya sendiri (opsional tapi disarankan)
+        // Cegah user menghapus dirinya sendiri
         if (auth()->id() === $user->id) {
             return redirect()->back()->with('error', 'You cannot delete your own account.');
         }
 
-        $user->delete();
-        return redirect()->back()->with('message', 'Team member removed successfully.');
+        try {
+            // Coba hapus usernya
+            $user->delete();
+            return redirect()->back()->with('message', 'Team member removed successfully.');
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Tangkap error 23000 (Integrity constraint violation / Relasi nyangkut)
+            if ($e->getCode() == "23000") {
+                return redirect()->back()->with('error', 'Cannot delete this user because they are still assigned as a Project Manager or have pending tasks. Please reassign their projects first.');
+            }
+
+            // Tangkap error database lainnya
+            return redirect()->back()->with('error', 'A database error occurred while trying to delete the user.');
+        }
     }
 
     public function show(User $user)
