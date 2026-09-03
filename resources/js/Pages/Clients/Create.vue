@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import AppLayout from "@/Layouts/AppLayout.vue";
-import { Head, Link, useForm } from "@inertiajs/vue3";
+import { Head, Link, useForm, usePage } from "@inertiajs/vue3";
+
+const page = usePage();
 
 const form = useForm({
-    client_code: "",
+    client_code: (page.props as any).global_settings?.client_code_prefix || "CLI-",
     name: "",
     contact_person: "",
     email: "",

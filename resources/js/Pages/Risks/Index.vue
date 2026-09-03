@@ -5,22 +5,58 @@ import StatusBadge from '@/Components/UI/StatusBadge.vue';
 import FormModal from '@/Components/Forms/FormModal.vue';
 import Pagination from '@/Components/Data/Pagination.vue';
 import InputError from '@/Components/InputError.vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
-import { AlertTriangle, Plus, Edit, Trash2 } from 'lucide-vue-next';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
+import { AlertTriangle, Plus, Search, Edit, Trash2 } from 'lucide-vue-next';
+import { debounce } from 'lodash-es';
 
 const props = defineProps<{
     risks: any;
     projects: any[];
     users: any[];
+    filters?: {
+        search?: string;
+        status?: string;
+        risk_level?: string;
+        severity?: string;
+    };
 }>();
+
+const page = usePage();
+const can = (permissionName: string) => {
+    const roles = (page.props.auth as any).roles || [];
+    const permissions = (page.props.auth as any).permissions || [];
+    if (roles.includes('Admin')) return true;
+    return permissions.includes(permissionName);
+};
+
+const search = ref(props.filters?.search || '');
+const status = ref(props.filters?.status || '');
+const riskLevel = ref(props.filters?.risk_level || props.filters?.severity || '');
+
+// Sync state if props.filters changes from URL navigation
+watch(() => props.filters, (newFilters) => {
+    if (newFilters) {
+        search.value = newFilters.search || '';
+        status.value = newFilters.status || '';
+        riskLevel.value = newFilters.risk_level || newFilters.severity || '';
+    }
+}, { deep: true });
+
+watch([search, status, riskLevel], debounce(([newSearch, newStatus, newRiskLevel]) => {
+    router.get(
+        route('risks.index'),
+        { search: newSearch, status: newStatus, risk_level: newRiskLevel },
+        { preserveState: true, preserveScroll: true, replace: true }
+    );
+}, 300));
 
 const showModal = ref(false);
 const editingRisk = ref<any>(null);
 
 const form = useForm({
     project_id: '',
-    risk_code: '',
+    risk_code: (page.props as any).global_settings?.risk_code_prefix || 'RSK-',
     title: '',
     risk_level: 'Low',
     owner_id: '',
@@ -32,6 +68,7 @@ const openCreateModal = () => {
     editingRisk.value = null;
     form.reset();
     form.clearErrors();
+    form.risk_code = (page.props as any).global_settings?.risk_code_prefix || 'RSK-';
     showModal.value = true;
 };
 
@@ -99,10 +136,36 @@ const getRiskColor = (level: string) => {
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Pantau dan mitigasi risiko seluruh project.</p>
                 </div>
-                <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
+                <button v-if="can('create_risks')" @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
                     <Plus class="w-4 h-4" />
                     Log Risk
                 </button>
+            </div>
+
+            <!-- Filters & Search -->
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="relative flex-1 max-w-md">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search class="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input v-model="search" type="text" placeholder="Search risk title or code..."
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors">
+                </div>
+                <select v-model="riskLevel"
+                    class="block w-full md:w-48 pl-3 pr-10 py-2 text-base border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    <option value="">All Risk Levels</option>
+                    <option value="Critical">Critical</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                </select>
+                <select v-model="status"
+                    class="block w-full md:w-48 pl-3 pr-10 py-2 text-base border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    <option value="">All Statuses</option>
+                    <option value="Open">Open</option>
+                    <option value="Mitigated">Mitigated</option>
+                    <option value="Closed">Closed</option>
+                </select>
             </div>
 
             <!-- Main Data Table -->
@@ -151,10 +214,10 @@ const getRiskColor = (level: string) => {
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">
-                                        <button @click="openEditModal(risk)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <button v-if="can('edit_risks')" @click="openEditModal(risk)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit">
                                             <Edit class="w-4 h-4" />
                                         </button>
-                                        <button @click="deleteItem(risk.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                                        <button v-if="can('delete_risks')" @click="deleteItem(risk.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete">
                                             <Trash2 class="w-4 h-4" />
                                         </button>
                                     </div>

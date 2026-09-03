@@ -1,31 +1,114 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue';
 import BentoCard from '@/Components/Bento/BentoCard.vue';
+import Pagination from '@/Components/Data/Pagination.vue';
 import { Head } from '@inertiajs/vue3';
-import { FolderKanban, CheckSquare, AlertTriangle, Calendar, Activity } from 'lucide-vue-next';
+import { Activity, Plus, Edit, Trash2, Calendar, Layers } from 'lucide-vue-next';
 
 defineProps<{
-    activities: any[];
+    activities: {
+        data: Array<{
+            id: number;
+            log_name: string;
+            description: string;
+            subject_type: string | null;
+            event: string | null;
+            subject_id: number | null;
+            causer_type: string | null;
+            causer_id: number | null;
+            properties: any;
+            created_at: string;
+            causer?: {
+                id: number;
+                name: string;
+                email: string;
+            } | null;
+            subject?: any;
+        }>;
+        links: any[];
+    };
 }>();
 
-const getIcon = (type: string) => {
-    switch (type) {
-        case 'project': return FolderKanban;
-        case 'task': return CheckSquare;
-        case 'risk': return AlertTriangle;
-        case 'meeting': return Calendar;
-        default: return Activity;
-    }
+const formatRelativeTime = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+    if (diffInSeconds < 60) return 'Just now';
+    const diffInMinutes = Math.floor(diffInSeconds / 60);
+    if (diffInMinutes < 60) return `${diffInMinutes} minute${diffInMinutes > 1 ? 's' : ''} ago`;
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 30) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`;
+    const diffInMonths = Math.floor(diffInDays / 30);
+    if (diffInMonths < 12) return `${diffInMonths} month${diffInMonths > 1 ? 's' : ''} ago`;
+    const diffInYears = Math.floor(diffInDays / 365);
+    return `${diffInYears} year${diffInYears > 1 ? 's' : ''} ago`;
 };
 
-const getColor = (type: string) => {
-    switch (type) {
-        case 'project': return 'bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400';
-        case 'task': return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400';
-        case 'risk': return 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400';
-        case 'meeting': return 'bg-purple-100 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400';
-        default: return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+const getSubjectName = (subjectType: string | null) => {
+    if (!subjectType) return 'System';
+    const parts = subjectType.split('\\');
+    return parts[parts.length - 1];
+};
+
+const getEventTheme = (event: string | null, description: string) => {
+    const action = (event || description || '').toLowerCase();
+    if (action.includes('create')) {
+        return {
+            icon: Plus,
+            nodeColor: 'bg-emerald-600 text-white ring-emerald-100 dark:ring-emerald-950',
+            badgeColor: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/80',
+            label: 'Created'
+        };
     }
+    if (action.includes('update') || action.includes('edit')) {
+        return {
+            icon: Edit,
+            nodeColor: 'bg-blue-600 text-white ring-blue-100 dark:ring-blue-950',
+            badgeColor: 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/80',
+            label: 'Updated'
+        };
+    }
+    if (action.includes('delete') || action.includes('destroy')) {
+        return {
+            icon: Trash2,
+            nodeColor: 'bg-rose-600 text-white ring-rose-100 dark:ring-rose-950',
+            badgeColor: 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800/80',
+            label: 'Deleted'
+        };
+    }
+    return {
+        icon: Activity,
+        nodeColor: 'bg-indigo-600 text-white ring-indigo-100 dark:ring-indigo-950',
+        badgeColor: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/80',
+        label: description || 'Action'
+    };
+};
+
+const getChangedAttributes = (activity: any) => {
+    return activity.properties?.attributes || activity.attribute_changes?.attributes || null;
+};
+
+const getOldAttributes = (activity: any) => {
+    return activity.properties?.old || activity.attribute_changes?.old || null;
+};
+
+const getSubjectTitle = (activity: any) => {
+    if (activity.subject) {
+        return activity.subject.name || activity.subject.title || activity.subject.task_code || activity.subject.project_code || activity.subject.risk_code || '';
+    }
+    const attrs = getChangedAttributes(activity);
+    if (attrs?.name || attrs?.title || attrs?.project_code || attrs?.task_code) {
+        return attrs.name || attrs.title || attrs.project_code || attrs.task_code;
+    }
+    const oldAttrs = getOldAttributes(activity);
+    if (oldAttrs?.name || oldAttrs?.title || oldAttrs?.project_code || oldAttrs?.task_code) {
+        return oldAttrs.name || oldAttrs.title || oldAttrs.project_code || oldAttrs.task_code;
+    }
+    return '';
 };
 </script>
 
@@ -33,48 +116,103 @@ const getColor = (type: string) => {
     <Head title="Activity Log" />
 
     <AppLayout>
-        <div class="max-w-4xl mx-auto space-y-6">
+        <div class="max-w-5xl mx-auto space-y-6">
 
-            <!-- Header section -->
+            <!-- Header Section -->
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <h2 class="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                         <Activity class="w-6 h-6 text-indigo-500" />
                         System Activity Log
                     </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Monitor all system events and user actions across projects.</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Audit trail and comprehensive timeline of data changes across all modules.
+                    </p>
                 </div>
             </div>
 
-            <!-- Timeline -->
-            <BentoCard noPadding class="p-8">
-                <div v-if="activities && activities.length > 0" class="relative border-l-2 border-gray-100 dark:border-gray-700 ml-4 space-y-8">
-                    <div v-for="activity in activities" :key="activity.id" class="relative pl-8">
-                        <div :class="['absolute -left-[17px] w-8 h-8 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-gray-800', getColor(activity.type)]">
-                            <component :is="getIcon(activity.type)" class="w-4 h-4" />
-                        </div>
-                        <div class="bg-gray-50/50 dark:bg-gray-800/30 rounded-xl p-4 border border-gray-100 dark:border-gray-700/50">
-                            <p class="text-sm text-gray-800 dark:text-gray-200">
-                                <span class="font-bold text-gray-900 dark:text-white">{{ activity.user }}</span>
-                                <span class="mx-1">{{ activity.action }}</span>
-                                <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{ activity.target }}</span>
-                            </p>
-                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium">{{ activity.date }}</p>
+            <!-- Main Vertical Timeline Card -->
+            <BentoCard noPadding>
+                <div class="p-6 md:p-8">
+                    <div v-if="activities.data && activities.data.length > 0" class="relative pl-6 md:pl-8 border-l-2 border-gray-200 dark:border-gray-700 space-y-8 my-2">
+                        <div v-for="activity in activities.data" :key="activity.id" class="relative group">
+                            <!-- Timeline Node Icon -->
+                            <div :class="[
+                                'absolute -left-[37px] md:-left-[45px] top-1.5 w-8 h-8 rounded-full flex items-center justify-center ring-4 ring-white dark:ring-gray-900 shadow-sm transition-transform group-hover:scale-110',
+                                getEventTheme(activity.event, activity.description).nodeColor
+                            ]">
+                                <component :is="getEventTheme(activity.event, activity.description).icon" class="w-4 h-4" />
+                            </div>
+
+                            <!-- Timeline Content Card -->
+                            <div class="bg-gray-50/70 dark:bg-gray-800/40 rounded-2xl p-5 border border-gray-100 dark:border-gray-700/60 shadow-xs hover:border-indigo-200 dark:hover:border-indigo-800/60 transition-all">
+                                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <!-- User / Causer -->
+                                        <div class="flex items-center gap-1.5 font-bold text-gray-900 dark:text-white text-sm">
+                                            <div class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xs">
+                                                {{ (activity.causer?.name || 'S').charAt(0).toUpperCase() }}
+                                            </div>
+                                            <span>{{ activity.causer?.name || 'System' }}</span>
+                                        </div>
+
+                                        <!-- Action Badge -->
+                                        <span :class="[
+                                            'px-2.5 py-0.5 rounded-full text-xs font-semibold border',
+                                            getEventTheme(activity.event, activity.description).badgeColor
+                                        ]">
+                                            {{ getEventTheme(activity.event, activity.description).label }}
+                                        </span>
+
+                                        <!-- Subject Type & Title -->
+                                        <div class="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300">
+                                            <span class="font-medium text-gray-500 dark:text-gray-400">{{ getSubjectName(activity.subject_type) }}</span>
+                                            <span v-if="getSubjectTitle(activity)" class="font-bold text-gray-900 dark:text-white">
+                                                "{{ getSubjectTitle(activity) }}"
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Relative Timestamp -->
+                                    <div class="text-xs text-gray-400 dark:text-gray-500 font-medium whitespace-nowrap flex items-center gap-1">
+                                        <Calendar class="w-3.5 h-3.5" />
+                                        <span>{{ formatRelativeTime(activity.created_at) }}</span>
+                                    </div>
+                                </div>
+
+                                <!-- Changed Properties Details (If Available) -->
+                                <div v-if="getChangedAttributes(activity)" class="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700/50">
+                                    <div class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
+                                        <Layers class="w-3.5 h-3.5 text-indigo-500" />
+                                        Changed Attributes:
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 mt-1">
+                                        <div v-for="(val, key) in (getChangedAttributes(activity) || {})" :key="key" class="text-xs px-2.5 py-1 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300">
+                                            <span class="font-medium text-gray-500 dark:text-gray-400">{{ key }}:</span>
+                                            <span v-if="getOldAttributes(activity) && getOldAttributes(activity)[key] !== undefined" class="text-rose-500 line-through ml-1">{{ getOldAttributes(activity)[key] }}</span>
+                                            <span v-if="getOldAttributes(activity) && getOldAttributes(activity)[key] !== undefined" class="mx-1 text-gray-400">→</span>
+                                            <span class="font-semibold text-emerald-600 dark:text-emerald-400 ml-1">{{ val }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                
-                <div v-else class="text-center py-12">
-                    <Activity class="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                    <h3 class="text-lg font-medium text-gray-900 dark:text-white">No activity yet</h3>
-                    <p class="text-sm text-gray-500 mt-1">Check back later when users start interacting with the system.</p>
+
+                    <!-- Empty State -->
+                    <div v-else class="text-center py-16">
+                        <div class="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-500 flex items-center justify-center mx-auto mb-4">
+                            <Activity class="w-8 h-8" />
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">No activity logged yet</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
+                            User actions like creating, updating, or deleting records will automatically appear here on this timeline.
+                        </p>
+                    </div>
                 </div>
 
-                <div v-if="activities && activities.length > 0" class="mt-8 text-center pt-6 border-t border-gray-100 dark:border-gray-700/50">
-                    <button class="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
-                        Load More Activities
-                    </button>
-                </div>
+                <!-- Pagination Footer -->
+                <Pagination v-if="activities.links" :links="activities.links" />
             </BentoCard>
 
         </div>

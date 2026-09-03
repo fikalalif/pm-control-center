@@ -16,7 +16,7 @@ class DashboardController extends Controller
         // Hitung statistik utama untuk Dashboard
         $stats = [
             'total_projects' => Project::count(),
-            'active_projects' => Project::whereNotIn('status', ['Completed', 'Cancelled'])->count(),
+            'active_projects' => Project::where('status', 'In Progress')->count(),
             'total_tasks' => Task::count(),
             'pending_tasks' => Task::where('status', 'Pending')->count(),
             'critical_risks' => Risk::whereIn('risk_level', ['High', 'Critical'])->where('status', 'Open')->count(),

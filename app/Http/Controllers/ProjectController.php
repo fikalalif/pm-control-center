@@ -8,25 +8,36 @@ use App\Models\ProjectPhase;
 use App\Models\ProjectType;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 use Inertia\Inertia;
 
-class ProjectController extends Controller
+class ProjectController extends Controller implements HasMiddleware
 {
+    // Middleware permissions
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_projects', only: ['index', 'show']),
+            new Middleware('can:create_projects', only: ['create', 'store']),
+            new Middleware('can:edit_projects', only: ['edit', 'update']),
+            new Middleware('can:delete_projects', only: ['destroy']),
+        ];
+    }
     public function index(Request $request)
     {
         $query = Project::with(['client', 'projectManager', 'currentPhase', 'projectType'])->latest();
 
-        if ($request->filled('search')) {
-            $search = $request->input('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('project_code', 'like', "%{$search}%");
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function ($sub) use ($search) {
+                $sub->where('name', 'like', "%{$search}%")
+                    ->orWhere('project_code', 'like', "%{$search}%");
             });
-        }
+        });
 
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
+        $query->when($request->status, function ($q, $status) {
+            $q->where('status', $status);
+        });
 
         $projects = $query->paginate(10)->withQueryString();
 
@@ -133,11 +144,8 @@ class ProjectController extends Controller
 
         return Inertia::render('Projects/Show', [
             'project' => $project,
-            // Hapus is_active kalau sebelumnya bikin error 500
             'users' => User::select('id', 'name')->get(),
             'vendors' => \App\Models\Vendor::select('id', 'name')->get(),
         ]);
     }
-
-    // Fungsi edit, update, dan destroy akan kita tambahkan nanti
 }

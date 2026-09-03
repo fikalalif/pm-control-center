@@ -10,22 +10,22 @@ class SettingSeeder extends Seeder
     public function run()
     {
         $settings = [
-            // 1. Workspace & Company Profile
-            ['group' => 'Company Profile', 'key' => 'company_name', 'value' => 'PM Control Center Inc.', 'type' => 'string'],
-            ['group' => 'Company Profile', 'key' => 'company_email', 'value' => 'admin@pmcontrol.com', 'type' => 'string'],
-            ['group' => 'Company Profile', 'key' => 'timezone', 'value' => 'Asia/Jakarta', 'type' => 'timezone'],
+            // General Settings
+            ['group' => 'general', 'key' => 'app_name', 'value' => 'PM Control Center', 'type' => 'string'],
+            ['group' => 'general', 'key' => 'timezone', 'value' => 'Asia/Jakarta', 'type' => 'string'],
 
-            // 2. UI/UX & Preferences
-            ['group' => 'UI Preferences', 'key' => 'default_theme', 'value' => 'system', 'type' => 'theme'],
-            ['group' => 'UI Preferences', 'key' => 'auto_collapse_sidebar', 'value' => '0', 'type' => 'boolean'],
+            // Module Code Prefixes
+            ['group' => 'prefixes', 'key' => 'project_code_prefix', 'value' => 'PRJ-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'task_code_prefix', 'value' => 'TSK-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'milestone_code_prefix', 'value' => 'MLS-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'risk_code_prefix', 'value' => 'RSK-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'issue_code_prefix', 'value' => 'ISS-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'change_request_code_prefix', 'value' => 'CRQ-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'client_code_prefix', 'value' => 'CLI-', 'type' => 'string'],
+            ['group' => 'prefixes', 'key' => 'vendor_code_prefix', 'value' => 'VND-', 'type' => 'string'],
 
-            // 3. Notifications & Integrations
-            ['group' => 'Notifications', 'key' => 'email_alerts', 'value' => '1', 'type' => 'boolean'],
-            ['group' => 'Notifications', 'key' => 'slack_webhook_url', 'value' => '', 'type' => 'string'],
-
-            // 4. Project Defaults
-            ['group' => 'Project Defaults', 'key' => 'project_id_prefix', 'value' => 'PRJ-', 'type' => 'string'],
-            ['group' => 'Project Defaults', 'key' => 'task_id_prefix', 'value' => 'TSK-', 'type' => 'string'],
+            // System Control
+            ['group' => 'system', 'key' => 'maintenance_mode', 'value' => 'false', 'type' => 'boolean'],
         ];
 
         foreach ($settings as $setting) {

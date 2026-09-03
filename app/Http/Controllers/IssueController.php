@@ -7,9 +7,21 @@ use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class IssueController extends Controller
+class IssueController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_issues', only: ['index', 'show']),
+            new Middleware('can:create_issues', only: ['create', 'store']),
+            new Middleware('can:edit_issues', only: ['edit', 'update']),
+            new Middleware('can:delete_issues', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
         $issues = Issue::with(['project', 'owner'])->latest()->paginate(15);

@@ -4,7 +4,7 @@ import BentoCard from '@/Components/Bento/BentoCard.vue';
 import FormModal from '@/Components/Forms/FormModal.vue';
 import Pagination from '@/Components/Data/Pagination.vue';
 import InputError from '@/Components/InputError.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, useForm, router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import { Users, Plus, Edit, Trash2 } from 'lucide-vue-next';
 
@@ -12,11 +12,19 @@ const props = defineProps<{
     clients: any;
 }>();
 
+const page = usePage();
+const can = (permissionName: string) => {
+    const roles = (page.props.auth as any).roles || [];
+    const permissions = (page.props.auth as any).permissions || [];
+    if (roles.includes('Admin')) return true;
+    return permissions.includes(permissionName);
+};
+
 const showModal = ref(false);
 const editingClient = ref<any>(null);
 
 const form = useForm({
-    client_code: '',
+    client_code: (page.props as any).global_settings?.client_code_prefix || 'CLI-',
     name: '',
     contact_person: '',
     phone: '',
@@ -29,6 +37,7 @@ const openCreateModal = () => {
     editingClient.value = null;
     form.reset();
     form.clearErrors();
+    form.client_code = (page.props as any).global_settings?.client_code_prefix || 'CLI-';
     showModal.value = true;
 };
 
@@ -88,7 +97,7 @@ const deleteClient = (id: number) => {
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage client data for Hetra Teknologi Indonesia.</p>
                 </div>
-                <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
+                <button v-if="can('create_clients')" @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
                     <Plus class="w-4 h-4" />
                     New Client
                 </button>
@@ -121,10 +130,10 @@ const deleteClient = (id: number) => {
                                 <td class="px-6 py-4">{{ client.industry || '-' }}</td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">
-                                        <button @click="openEditModal(client)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <button v-if="can('edit_clients')" @click="openEditModal(client)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit">
                                             <Edit class="w-4 h-4" />
                                         </button>
-                                        <button @click="deleteClient(client.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                                        <button v-if="can('delete_clients')" @click="deleteClient(client.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete">
                                             <Trash2 class="w-4 h-4" />
                                         </button>
                                     </div>

@@ -4,15 +4,37 @@ namespace App\Http\Controllers;
 
 use App\Models\Task;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class TaskController extends Controller
+class TaskController extends Controller implements HasMiddleware
 {
-    public function index()
+    public static function middleware(): array
     {
-        // Ambil semua task dari seluruh project, include relasinya
-        $tasks = Task::with(['project', 'assignedUser', 'vendor'])
-            ->latest()
-            ->paginate(15);
+        return [
+            new Middleware('can:view_tasks', only: ['index', 'show']),
+            new Middleware('can:create_tasks', only: ['create', 'store']),
+            new Middleware('can:edit_tasks', only: ['edit', 'update']),
+            new Middleware('can:delete_tasks', only: ['destroy']),
+        ];
+    }
+
+    public function index(Request $request)
+    {
+        $query = Task::with(['project', 'assignedUser', 'vendor'])->latest();
+
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function ($sub) use ($search) {
+                $sub->where('name', 'like', "%{$search}%")
+                    ->orWhere('task_code', 'like', "%{$search}%");
+            });
+        });
+
+        $query->when($request->status, function ($q, $status) {
+            $q->where('status', $status);
+        });
+
+        $tasks = $query->paginate(15)->withQueryString();
 
         return \Inertia\Inertia::render('Tasks/Index', [
             'tasks' => $tasks,
@@ -20,6 +42,7 @@ class TaskController extends Controller
             'projects' => \App\Models\Project::select('id', 'name', 'project_code')->get(),
             'users' => \App\Models\User::select('id', 'name')->get(),
             'vendors' => \App\Models\Vendor::select('id', 'name')->get(),
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
     public function store(Request $request)

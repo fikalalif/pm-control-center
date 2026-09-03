@@ -6,15 +6,33 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
+use Spatie\Permission\Models\Role;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class UserController extends Controller
+class UserController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_users', only: ['index', 'show']),
+            new Middleware('can:create_users', only: ['create', 'store']),
+            new Middleware('can:edit_users', only: ['edit', 'update']),
+            new Middleware('can:delete_users', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
-        $users = User::latest()->paginate(15);
+        // Panggil relasi 'roles' bawaan Spatie, bukan 'role'
+        $users = User::with('roles')->latest()->paginate(10);
+
+        // Ambil semua nama role untuk dropdown di Vue
+        $roles = Role::pluck('name');
 
         return Inertia::render('Users/Index', [
-            'users' => $users
+            'users' => $users,
+            'roles' => $roles
         ]);
     }
 
@@ -23,16 +41,23 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
+            'phone' => 'nullable|string|max:20',
             'password' => 'required|string|min:8',
+            'role' => 'required|string|exists:roles,name', // Validasi input role
         ]);
 
-        User::create([
+        $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'password' => Hash::make($validated['password']),
+            'phone' => $validated['phone'] ?? null,
+            'password' => bcrypt($validated['password']),
+            'is_active' => true,
         ]);
 
-        return redirect()->back()->with('message', 'Team member added successfully.');
+        // Pasang role ke user baru
+        $user->assignRole($validated['role']);
+
+        return redirect()->back()->with('message', 'User created successfully.');
     }
 
     public function destroy(User $user)
@@ -77,17 +102,24 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'phone' => 'nullable|string|max:20',
             'password' => 'nullable|string|min:8',
+            'role' => 'required|string|exists:roles,name',
         ]);
 
-        if (!empty($validated['password'])) {
-            $validated['password'] = Hash::make($validated['password']);
-        } else {
-            unset($validated['password']);
+        $user->update([
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'phone' => $validated['phone'] ?? null,
+        ]);
+
+        if ($request->filled('password')) {
+            $user->update(['password' => bcrypt($validated['password'])]);
         }
 
-        $user->update($validated);
+        // Sync role (hapus role lama, ganti yang baru)
+        $user->syncRoles([$validated['role']]);
 
-        return redirect()->back()->with('message', 'Team member updated successfully.');
+        return redirect()->back()->with('message', 'User updated successfully.');
     }
 }

@@ -5,9 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class VendorController extends Controller
+class VendorController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_vendors', only: ['index', 'show']),
+            new Middleware('can:create_vendors', only: ['create', 'store']),
+            new Middleware('can:edit_vendors', only: ['edit', 'update']),
+            new Middleware('can:delete_vendors', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
         $vendors = Vendor::latest()->paginate(15);

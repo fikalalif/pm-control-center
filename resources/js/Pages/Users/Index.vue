@@ -11,9 +11,16 @@ import { User, Plus, Edit, Trash2 } from 'lucide-vue-next';
 
 const props = defineProps<{
     users: any;
+    roles: string[]; // Terima data roles dari controller[cite: 4]
 }>();
 
 const page = usePage();
+const can = (permissionName: string) => {
+    const roles = (page.props.auth as any).roles || [];
+    const permissions = (page.props.auth as any).permissions || [];
+    if (roles.includes('Admin')) return true;
+    return permissions.includes(permissionName);
+};
 
 const flashMessage = computed(() => (page.props as any).flash?.message);
 const flashError = computed(() => (page.props as any).flash?.error);
@@ -26,7 +33,9 @@ const editingUser = ref<any>(null);
 const form = useForm({
     name: '',
     email: '',
+    phone: '',
     password: '',
+    role: '',
 });
 
 const openCreateModal = () => {
@@ -41,7 +50,9 @@ const openEditModal = (user: any) => {
     form.clearErrors();
     form.name = user.name || '';
     form.email = user.email || '';
-    form.password = ''; // Don't fill password on edit
+    form.phone = user.phone || '';
+    form.password = '';
+    form.role = user.roles?.[0]?.name || ''; // Ambil role pertama dari relasi Spatie[cite: 4]
     showModal.value = true;
 };
 
@@ -100,7 +111,6 @@ const deleteUser = (id: number) => {
 
     <AppLayout>
 
-
         <div class="max-w-7xl mx-auto space-y-6">
             <!-- Header section -->
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -112,7 +122,7 @@ const deleteUser = (id: number) => {
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage internal team members and access.
                     </p>
                 </div>
-                <button @click="openCreateModal"
+                <button v-if="can('create_users')" @click="openCreateModal"
                     class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
                     <Plus class="w-4 h-4" />
                     New Member
@@ -128,6 +138,7 @@ const deleteUser = (id: number) => {
                             <tr>
                                 <th class="px-6 py-4">Name</th>
                                 <th class="px-6 py-4">Email</th>
+                                <th class="px-6 py-4">Phone (WhatsApp)</th>
                                 <th class="px-6 py-4">Role</th>
                                 <th class="px-6 py-4">Joined Date</th>
                                 <th class="px-6 py-4 text-right">Actions</th>
@@ -143,33 +154,40 @@ const deleteUser = (id: number) => {
                                             {{ user.name.charAt(0).toUpperCase() }}
                                         </div>
                                         <span class="font-bold text-gray-900 dark:text-white">
-                                            {{ user.name }}
+                                             {{ user.name }}
                                             <span v-if="currentUser.id === user.id"
                                                 class="ml-2 text-[10px] bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded-full">You</span>
                                         </span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">{{ user.email }}</td>
+                                <td class="px-6 py-4 font-mono text-xs text-gray-600 dark:text-gray-300">
+                                    <span v-if="user.phone">{{ user.phone }}</span>
+                                    <span v-else class="text-gray-400 italic">Not set</span>
+                                </td>
                                 <td class="px-6 py-4">
-                                    <span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Member</span>
+                                    <!-- Menampilkan role dari relasi Spatie -->
+                                    <span class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                        {{ user.roles?.[0]?.name || 'No Role' }}
+                                    </span>
                                 </td>
                                 <td class="px-6 py-4">{{ new Date(user.created_at).toLocaleDateString('id-ID') }}</td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">
-                                        <button @click="openEditModal(user)"
-                                            class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <button v-if="can('edit_users')" @click="openEditModal(user)"
+                                            class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit">
                                             <Edit class="w-4 h-4" />
                                         </button>
-                                        <button v-if="currentUser.id !== user.id" @click="deleteUser(user.id)"
-                                            class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                                        <button v-if="can('delete_users') && currentUser.id !== user.id" @click="deleteUser(user.id)"
+                                            class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete">
                                             <Trash2 class="w-4 h-4" />
                                         </button>
-                                        <span v-else class="text-gray-400 text-xs italic">N/A</span>
+                                        <span v-else-if="currentUser.id === user.id" class="text-gray-400 text-xs italic">N/A</span>
                                     </div>
                                 </td>
                             </tr>
                             <tr v-if="!users.data || users.data.length === 0">
-                                <td colspan="5" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                                <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                                     No team members found.
                                 </td>
                             </tr>
@@ -201,6 +219,26 @@ const deleteUser = (id: number) => {
                     <input v-model="form.email" type="email"
                         class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-sm">
                     <InputError :message="form.errors.email" class="mt-1" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number (WhatsApp)</label>
+                    <input v-model="form.phone" type="text" placeholder="e.g. 081234567890"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono">
+                    <p class="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Used for project notifications via WhatsApp Gateway.</p>
+                    <InputError :message="form.errors.phone" class="mt-1" />
+                </div>
+
+                <!-- Dropdown Role Baru -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role <span
+                            class="text-rose-500">*</span></label>
+                    <select v-model="form.role"
+                        class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-sm">
+                        <option value="" disabled>Select a role</option>
+                        <option v-for="role in roles" :key="role" :value="role">{{ role }}</option>
+                    </select>
+                    <InputError :message="form.errors.role" class="mt-1" />
                 </div>
 
                 <div>

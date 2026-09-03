@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
 import { ref, computed } from 'vue';
 import BentoCard from '@/Components/Bento/BentoCard.vue';
 import StatusBadge from '@/Components/UI/StatusBadge.vue';
 import FormModal from '@/Components/Forms/FormModal.vue';
+import { MessageCircle, CheckCircle2, AlertCircle } from 'lucide-vue-next';
 
 const props = defineProps<{
     project: any;
@@ -421,6 +422,51 @@ const deleteMeeting = (id: number) => {
         router.delete(route('meetings.destroy', id), { preserveScroll: true });
     }
 };
+
+// --- WHATSAPP CLICK-TO-CHAT MODAL LOGIC ---
+const page = usePage();
+const showNotifyModal = ref(false);
+const waMessage = ref('');
+
+const pmPhoneNumber = computed(() => {
+    const rawPhone = props.project.project_manager?.phone || props.project.projectManager?.phone || '';
+    if (!rawPhone) return '';
+
+    // Bersihkan karakter non-digit (spasi, tanda strip, plus, kurung)
+    let cleaned = rawPhone.replace(/[^0-9]/g, '');
+
+    // Ubah awalan '0' menjadi '62'
+    if (cleaned.startsWith('0')) {
+        cleaned = '62' + cleaned.slice(1);
+    }
+
+    return cleaned;
+});
+
+const openNotifyModal = () => {
+    const pmName = props.project.project_manager?.name || props.project.projectManager?.name || 'Project Manager';
+    const projectName = props.project.name || 'Project';
+    const status = props.project.status || 'In Progress';
+    const projectUrl = typeof window !== 'undefined' ? window.location.href : route('projects.show', props.project.id);
+
+    // Template pesan default yang bisa diedit di textarea
+    waMessage.value = `Halo ${pmName}, ini reminder untuk project *${projectName}*. Status saat ini: *${status}*. Tolong segera di-follow up ya. Link: ${projectUrl}`;
+
+    showNotifyModal.value = true;
+};
+
+const openWhatsApp = () => {
+    if (!pmPhoneNumber.value) {
+        alert('Nomor WhatsApp Project Manager tidak valid atau belum diisi.');
+        return;
+    }
+
+    const encoded = encodeURIComponent(waMessage.value);
+    const url = `https://wa.me/${pmPhoneNumber.value}?text=${encoded}`;
+
+    window.open(url, '_blank');
+    showNotifyModal.value = false;
+};
 </script>
 
 <template>
@@ -430,11 +476,41 @@ const deleteMeeting = (id: number) => {
     <AppLayout>
         <div class="max-w-7xl mx-auto space-y-6">
 
-            <div class="flex items-center gap-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <Link :href="route('projects.index')"
                     class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-sm font-medium">
                     &larr; Back to Projects
                 </Link>
+
+                <div class="flex items-center gap-3">
+                    <button
+                        v-if="pmPhoneNumber"
+                        @click="openNotifyModal"
+                        type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                        title="Draft & send reminder to PM via WhatsApp"
+                    >
+                        <MessageCircle class="w-4 h-4" />
+                        <span>Notify PM</span>
+                    </button>
+                    <span
+                        v-else
+                        class="inline-flex items-center gap-1.5 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 rounded-xl text-xs font-medium cursor-not-allowed"
+                        title="Project Manager does not have a phone number registered"
+                    >
+                        <MessageCircle class="w-4 h-4" />
+                        <span>PM No Phone</span>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Success Alert Banner -->
+            <div 
+                v-if="(page.props as any).flash?.message" 
+                class="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-sm font-medium"
+            >
+                <CheckCircle2 class="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>{{ (page.props as any).flash?.message }}</span>
             </div>
 
             <!-- PROJECT HEADER -->
@@ -1195,6 +1271,56 @@ const deleteMeeting = (id: number) => {
 
                 </div>
             </div>
+
+            <!-- WhatsApp Message Preview / Edit Modal -->
+            <FormModal
+                :show="showNotifyModal"
+                title="Send WhatsApp Reminder to PM"
+                @close="showNotifyModal = false"
+                @submit="openWhatsApp"
+                maxWidth="lg"
+            >
+                <div class="space-y-4">
+                    <div class="p-3.5 bg-emerald-50 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800/60 text-xs text-emerald-800 dark:text-emerald-300">
+                        Target WhatsApp: <strong>{{ project.project_manager?.name || 'Project Manager' }}</strong>
+                        <span class="font-mono ml-1">({{ project.project_manager?.phone || pmPhoneNumber }})</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                            WhatsApp Message Template (Editable)
+                        </label>
+                        <textarea
+                            v-model="waMessage"
+                            rows="6"
+                            class="w-full rounded-xl border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-emerald-500 focus:border-emerald-500 text-sm font-mono placeholder-gray-400"
+                            placeholder="Type WhatsApp message..."
+                            required
+                        ></textarea>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
+                            You can customize this message before opening WhatsApp.
+                        </p>
+                    </div>
+                </div>
+
+                <template #actions>
+                    <button
+                        type="button"
+                        @click="showNotifyModal = false"
+                        class="px-4 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        @click="openWhatsApp"
+                        class="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                        <MessageCircle class="w-4 h-4" />
+                        <span>Open in WhatsApp</span>
+                    </button>
+                </template>
+            </FormModal>
 
         </div>
     </AppLayout>

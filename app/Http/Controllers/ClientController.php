@@ -5,9 +5,21 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class ClientController extends Controller
+class ClientController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_clients', only: ['index', 'show']),
+            new Middleware('can:create_clients', only: ['create', 'store']),
+            new Middleware('can:edit_clients', only: ['edit', 'update']),
+            new Middleware('can:delete_clients', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
         // Mengambil data client terbaru, ditambah pagination
