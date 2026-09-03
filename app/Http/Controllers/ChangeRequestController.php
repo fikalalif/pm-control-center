@@ -7,9 +7,21 @@ use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class ChangeRequestController extends Controller
+class ChangeRequestController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_change_requests', only: ['index', 'show']),
+            new Middleware('can:create_change_requests', only: ['create', 'store']),
+            new Middleware('can:edit_change_requests', only: ['edit', 'update']),
+            new Middleware('can:delete_change_requests', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
         $changeRequests = ChangeRequest::with(['project', 'approvedBy'])->latest()->paginate(15);

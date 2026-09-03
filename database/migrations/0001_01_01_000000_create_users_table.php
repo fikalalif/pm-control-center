@@ -10,13 +10,6 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        // 1. Buat tabel roles terlebih dahulu
-        Schema::create('roles', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->timestamps();
-        });
-
         // 2. Baru buat tabel users
         Schema::create('users', function (Blueprint $table) {
             $table->id();
@@ -26,7 +19,7 @@ return new class extends Migration {
             $table->string('password');
 
             // Relasi ke roles
-            $table->foreignId('role_id')->nullable()->constrained('roles')->nullOnDelete();
+
             $table->boolean('is_active')->default(true);
 
             $table->rememberToken();

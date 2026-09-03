@@ -5,22 +5,54 @@ import StatusBadge from '@/Components/UI/StatusBadge.vue';
 import FormModal from '@/Components/Forms/FormModal.vue';
 import Pagination from '@/Components/Data/Pagination.vue';
 import InputError from '@/Components/InputError.vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
 import { CheckSquare, Plus, Search, Filter, MoreVertical, Edit, Trash2 } from 'lucide-vue-next';
+import { debounce } from 'lodash-es';
 
 const props = defineProps<{
     tasks: any;
     projects: any[];
     users: any[];
     vendors: any[];
+    filters?: {
+        search?: string;
+        status?: string;
+    };
 }>();
+
+const page = usePage();
+const can = (permissionName: string) => {
+    const roles = (page.props.auth as any).roles || [];
+    const permissions = (page.props.auth as any).permissions || [];
+    if (roles.includes('Admin')) return true;
+    return permissions.includes(permissionName);
+};
+
+const search = ref(props.filters?.search || '');
+const status = ref(props.filters?.status || '');
+
+// Sync state if props.filters changes from URL navigation
+watch(() => props.filters, (newFilters) => {
+    if (newFilters) {
+        search.value = newFilters.search || '';
+        status.value = newFilters.status || '';
+    }
+}, { deep: true });
+
+watch([search, status], debounce(([newSearch, newStatus]) => {
+    router.get(
+        route('tasks.index'),
+        { search: newSearch, status: newStatus },
+        { preserveState: true, preserveScroll: true, replace: true }
+    );
+}, 300));
 
 const showModal = ref(false);
 const editingTask = ref<any>(null);
 
 const form = useForm({
-    task_code: '',
+    task_code: (page.props as any).global_settings?.task_code_prefix || 'TSK-',
     project_id: '',
     name: '',
     description: '',
@@ -36,6 +68,7 @@ const openCreateModal = () => {
     editingTask.value = null;
     form.reset();
     form.clearErrors();
+    form.task_code = (page.props as any).global_settings?.task_code_prefix || 'TSK-';
     showModal.value = true;
 };
 
@@ -98,10 +131,29 @@ const deleteTask = (id: number) => {
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage and track all project tasks globally.</p>
                 </div>
-                <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
+                <button v-if="can('create_tasks')" @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
                     <Plus class="w-4 h-4" />
                     New Task
                 </button>
+            </div>
+
+            <!-- Filters & Search -->
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="relative flex-1 max-w-md">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search class="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input v-model="search" type="text" placeholder="Search task name or code..."
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors">
+                </div>
+                <select v-model="status"
+                    class="block w-full md:w-48 pl-3 pr-10 py-2 text-base border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    <option value="">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
             </div>
 
             <!-- Main Data Table -->
@@ -148,10 +200,10 @@ const deleteTask = (id: number) => {
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">
-                                        <button @click="openEditModal(task)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <button v-if="can('edit_tasks')" @click="openEditModal(task)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit">
                                             <Edit class="w-4 h-4" />
                                         </button>
-                                        <button @click="deleteTask(task.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                                        <button v-if="can('delete_tasks')" @click="deleteTask(task.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete">
                                             <Trash2 class="w-4 h-4" />
                                         </button>
                                     </div>

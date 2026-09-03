@@ -6,9 +6,21 @@ use App\Models\Meeting;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class MeetingController extends Controller
+class MeetingController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('can:view_meetings', only: ['index', 'show']),
+            new Middleware('can:create_meetings', only: ['create', 'store']),
+            new Middleware('can:edit_meetings', only: ['edit', 'update']),
+            new Middleware('can:delete_meetings', only: ['destroy']),
+        ];
+    }
+
     public function index()
     {
         $meetings = Meeting::with(['project'])->latest()->paginate(15);

@@ -6,17 +6,47 @@ use App\Models\Milestone;
 use App\Models\Project;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class MilestoneController extends Controller
+class MilestoneController extends Controller implements HasMiddleware
 {
-    // Tampilan Global di Sidebar
-    public function index()
+    public static function middleware(): array
     {
-        $milestones = Milestone::with(['project'])->latest()->paginate(15);
+        return [
+            new Middleware('can:view_milestones', only: ['index', 'show']),
+            new Middleware('can:create_milestones', only: ['create', 'store']),
+            new Middleware('can:edit_milestones', only: ['edit', 'update']),
+            new Middleware('can:delete_milestones', only: ['destroy']),
+        ];
+    }
+
+    // Tampilan Global di Sidebar
+    public function index(Request $request)
+    {
+        $query = Milestone::with(['project'])->latest();
+
+        $query->when($request->search, function ($q, $search) {
+            $q->where(function ($sub) use ($search) {
+                $sub->where('name', 'like', "%{$search}%")
+                    ->orWhere('milestone_code', 'like', "%{$search}%");
+            });
+        });
+
+        $query->when($request->filter === 'upcoming', function ($q) {
+            $q->where('status', 'Pending')->whereDate('due_date', '>=', now());
+        });
+
+        $query->when($request->status, function ($q, $status) {
+            $q->where('status', $status);
+        });
+
+        $milestones = $query->paginate(15)->withQueryString();
 
         return Inertia::render('Milestones/Index', [
             'milestones' => $milestones,
             'projects' => Project::select('id', 'name', 'project_code')->get(),
+            'filters' => $request->only(['search', 'status', 'filter']),
         ]);
     }
 

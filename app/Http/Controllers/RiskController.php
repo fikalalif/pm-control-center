@@ -7,18 +7,55 @@ use App\Models\Project;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class RiskController extends Controller
+class RiskController extends Controller implements HasMiddleware
 {
-    // Tampilan Global di Sidebar
-    public function index()
+    public static function middleware(): array
     {
-        $risks = Risk::with(['project', 'owner'])->latest()->paginate(15);
+        return [
+            new Middleware('can:view_risks', only: ['index', 'show']),
+            new Middleware('can:create_risks', only: ['create', 'store']),
+            new Middleware('can:edit_risks', only: ['edit', 'update']),
+            new Middleware('can:delete_risks', only: ['destroy']),
+        ];
+    }
+
+    // Tampilan Global di Sidebar
+    public function index(Request $request)
+    {
+        $query = Risk::with(['project', 'owner'])->latest();
+
+        if ($request->filled('search')) {
+            $search = $request->input('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('risk_code', 'like', "%{$search}%");
+            });
+        }
+
+        $riskLevel = $request->input('risk_level') ?? $request->input('severity');
+        if ($riskLevel) {
+            $query->where('risk_level', $riskLevel);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+
+        $risks = $query->paginate(15)->withQueryString();
 
         return Inertia::render('Risks/Index', [
             'risks' => $risks,
             'projects' => Project::select('id', 'name', 'project_code')->get(),
             'users' => User::select('id', 'name')->get(),
+            'filters' => [
+                'search' => $request->input('search'),
+                'status' => $request->input('status'),
+                'risk_level' => $riskLevel,
+                'severity' => $riskLevel,
+            ],
         ]);
     }
 

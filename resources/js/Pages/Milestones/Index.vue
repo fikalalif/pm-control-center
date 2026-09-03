@@ -5,19 +5,55 @@ import StatusBadge from '@/Components/UI/StatusBadge.vue';
 import FormModal from '@/Components/Forms/FormModal.vue';
 import Pagination from '@/Components/Data/Pagination.vue';
 import InputError from '@/Components/InputError.vue';
-import { Head, Link, useForm, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
-import { Flag, Plus, Edit, Trash2 } from 'lucide-vue-next';
+import { Head, Link, useForm, router, usePage } from '@inertiajs/vue3';
+import { ref, watch } from 'vue';
+import { Flag, Plus, Search, Edit, Trash2 } from 'lucide-vue-next';
+import { debounce } from 'lodash-es';
 
 const props = defineProps<{
     milestones: any;
     projects: any[];
+    filters?: {
+        search?: string;
+        status?: string;
+        filter?: string;
+    };
 }>();
+
+const page = usePage();
+const can = (permissionName: string) => {
+    const roles = (page.props.auth as any).roles || [];
+    const permissions = (page.props.auth as any).permissions || [];
+    if (roles.includes('Admin')) return true;
+    return permissions.includes(permissionName);
+};
+
+const search = ref(props.filters?.search || '');
+const status = ref(props.filters?.status || '');
+const timeframeFilter = ref(props.filters?.filter || '');
+
+// Sync state if props.filters changes from URL navigation
+watch(() => props.filters, (newFilters) => {
+    if (newFilters) {
+        search.value = newFilters.search || '';
+        status.value = newFilters.status || '';
+        timeframeFilter.value = newFilters.filter || '';
+    }
+}, { deep: true });
+
+watch([search, status, timeframeFilter], debounce(([newSearch, newStatus, newFilter]) => {
+    router.get(
+        route('milestones.index'),
+        { search: newSearch, status: newStatus, filter: newFilter },
+        { preserveState: true, preserveScroll: true, replace: true }
+    );
+}, 300));
 
 const showModal = ref(false);
 const editingMilestone = ref<any>(null);
 
 const form = useForm({
+    milestone_code: (page.props as any).global_settings?.milestone_code_prefix || 'MLS-',
     project_id: '',
     name: '',
     due_date: '',
@@ -29,12 +65,14 @@ const openCreateModal = () => {
     editingMilestone.value = null;
     form.reset();
     form.clearErrors();
+    form.milestone_code = (page.props as any).global_settings?.milestone_code_prefix || 'MLS-';
     showModal.value = true;
 };
 
 const openEditModal = (milestone: any) => {
     editingMilestone.value = milestone;
     form.clearErrors();
+    form.milestone_code = milestone.milestone_code || '';
     form.project_id = milestone.project_id;
     form.name = milestone.name;
     form.due_date = milestone.due_date || '';
@@ -84,10 +122,34 @@ const deleteItem = (id: number) => {
                     </h2>
                     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Pantau target pencapaian semua project.</p>
                 </div>
-                <button @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
+                <button v-if="can('create_milestones')" @click="openCreateModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2 transition-colors">
                     <Plus class="w-4 h-4" />
                     New Milestone
                 </button>
+            </div>
+
+            <!-- Filters & Search -->
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="relative flex-1 max-w-md">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search class="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input v-model="search" type="text" placeholder="Search milestone name or code..."
+                        class="block w-full pl-10 pr-3 py-2 border border-gray-200 dark:border-gray-700 rounded-xl leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition-colors">
+                </div>
+                <select v-model="timeframeFilter"
+                    class="block w-full md:w-48 pl-3 pr-10 py-2 text-base border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    <option value="">All Timeframes</option>
+                    <option value="upcoming">Upcoming Only</option>
+                </select>
+                <select v-model="status"
+                    class="block w-full md:w-48 pl-3 pr-10 py-2 text-base border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-xl bg-white dark:bg-gray-800 text-gray-900 dark:text-white">
+                    <option value="">All Statuses</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Completed">Completed</option>
+                    <option value="Delayed">Delayed</option>
+                </select>
             </div>
 
             <!-- Main Data Table -->
@@ -121,10 +183,10 @@ const deleteItem = (id: number) => {
                                 </td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex items-center justify-end gap-3">
-                                        <button @click="openEditModal(ms)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors">
+                                        <button v-if="can('edit_milestones')" @click="openEditModal(ms)" class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit">
                                             <Edit class="w-4 h-4" />
                                         </button>
-                                        <button @click="deleteItem(ms.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors">
+                                        <button v-if="can('delete_milestones')" @click="deleteItem(ms.id)" class="text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete">
                                             <Trash2 class="w-4 h-4" />
                                         </button>
                                     </div>
@@ -149,6 +211,12 @@ const deleteItem = (id: number) => {
         <FormModal :show="showModal" :title="editingMilestone ? 'Edit Milestone' : 'New Milestone'" @close="showModal = false" @submit="submitForm" maxWidth="2xl">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Milestone Code</label>
+                    <input v-model="form.milestone_code" type="text" placeholder="Ex: MLS-001" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-sm font-mono">
+                    <InputError :message="form.errors.milestone_code" class="mt-1" />
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project <span class="text-rose-500">*</span></label>
                     <select v-model="form.project_id" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-sm">
                         <option value="" disabled>Select Project...</option>
@@ -157,7 +225,7 @@ const deleteItem = (id: number) => {
                     <InputError :message="form.errors.project_id" class="mt-1" />
                 </div>
                 
-                <div>
+                <div class="md:col-span-2">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Milestone Name <span class="text-rose-500">*</span></label>
                     <input v-model="form.name" type="text" placeholder="Ex: Phase 1 Release" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white focus:ring-indigo-500 focus:border-indigo-500 text-sm">
                     <InputError :message="form.errors.name" class="mt-1" />

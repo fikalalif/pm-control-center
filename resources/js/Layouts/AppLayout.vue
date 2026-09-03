@@ -1,15 +1,47 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import NotificationDropdown from '@/Components/UI/NotificationDropdown.vue';
 import {
     LayoutDashboard, FolderKanban, CheckSquare, Flag,
     AlertTriangle, XCircle, FileEdit, Briefcase,
-    Truck, Users, Calendar, Activity, Settings, Sun, Moon
+    Truck, Users, Shield, Calendar, Activity, Settings, Sun, Moon // <-- Tambahan Shield icon
 } from 'lucide-vue-next';
+const page = usePage();
 
-// Navigasi Sidebar Global menggunakan routeName agar lebih aman
-const navGroups = [
+// Fungsi untuk mengecek permission
+// Fungsi untuk mengecek permission
+const can = (permissionName?: string) => {
+    if (!permissionName) return true;
+
+    // Ambil data roles dan permissions dari Inertia
+    const roles = (page.props.auth as any).roles || [];
+    const permissions = (page.props.auth as any).permissions || [];
+
+    // BYPASS: Kalau dia Admin, langsung buka semua menu!
+    if (roles.includes('Admin')) {
+        return true;
+    }
+
+    return permissions.includes(permissionName);
+};
+
+// 1. Definisi Tipe Data untuk TypeScript
+type NavItem = {
+    name: string;
+    routeName: string;
+    url: string;
+    icon: any;
+    permission?: string; // <-- Tanda "?" bikin property ini opsional biar TS gak cerewet
+};
+
+type NavGroup = {
+    name: string;
+    items: NavItem[];
+};
+
+// 2. Terapkan NavGroup[] ke variabel dan PASANG permission-nya
+const navGroups: NavGroup[] = [
     {
         name: 'DASHBOARD',
         items: [
@@ -19,36 +51,33 @@ const navGroups = [
     {
         name: 'PROJECT MANAGEMENT',
         items: [
-            { name: 'Projects', routeName: 'projects.index', url: '/projects', icon: FolderKanban },
-            { name: 'Tasks', routeName: 'tasks.index', url: '/tasks', icon: CheckSquare },
-            { name: 'Milestones', routeName: 'milestones.index', url: '/milestones', icon: Flag },
-            { name: 'Risks', routeName: 'risks.index', url: '/risks', icon: AlertTriangle },
-            { name: 'Issues', routeName: 'issues.index', url: '/issues', icon: XCircle },
-            { name: 'Change Requests', routeName: 'change-requests.index', url: '/change-requests', icon: FileEdit },
+            { name: 'Projects', routeName: 'projects.index', url: '/projects', icon: FolderKanban, permission: 'view_projects' },
+            { name: 'Tasks', routeName: 'tasks.index', url: '/tasks', icon: CheckSquare, permission: 'view_tasks' },
+            { name: 'Milestones', routeName: 'milestones.index', url: '/milestones', icon: Flag, permission: 'view_milestones' },
+            { name: 'Risks', routeName: 'risks.index', url: '/risks', icon: AlertTriangle, permission: 'view_risks' },
+            { name: 'Issues', routeName: 'issues.index', url: '/issues', icon: XCircle, permission: 'view_issues' },
+            { name: 'Change Requests', routeName: 'change-requests.index', url: '/change-requests', icon: FileEdit, permission: 'view_change_requests' },
         ]
     },
     {
         name: 'STAKEHOLDERS',
         items: [
-            { name: 'Clients', routeName: 'clients.index', url: '/clients', icon: Briefcase },
-            { name: 'Vendors', routeName: 'vendors.index', url: '/vendors', icon: Truck },
-            { name: 'Team', routeName: 'users.index', url: '/users', icon: Users },
+            { name: 'Clients', routeName: 'clients.index', url: '/clients', icon: Briefcase, permission: 'view_clients' },
+            { name: 'Vendors', routeName: 'vendors.index', url: '/vendors', icon: Truck, permission: 'view_vendors' },
+            { name: 'Team', routeName: 'users.index', url: '/users', icon: Users, permission: 'view_users' },
+            { name: 'Roles & Access', routeName: 'roles.index', url: '/roles', icon: Shield, permission: 'manage_roles' },
         ]
     },
     {
         name: 'ACTIVITY',
         items: [
-            { name: 'Meetings', routeName: 'meetings.index', url: '/meetings', icon: Calendar },
-            // Di dalam menu ACTIVITY
+            { name: 'Meetings', routeName: 'meetings.index', url: '/meetings', icon: Calendar, permission: 'view_meetings' },
             { name: 'Activity Log', routeName: 'activity-log.index', url: '/activity-log', icon: Activity },
-
-
         ]
     },
     {
         name: 'SYSTEM',
         items: [
-            // Di dalam menu SYSTEM
             { name: 'Settings', routeName: 'settings.index', url: '/settings', icon: Settings }
         ]
     }
@@ -88,12 +117,10 @@ onMounted(() => {
         <aside
             class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-colors duration-200">
             <div
-                class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700 font-bold text-lg tracking-tight">
-                PM Control Center
+                class="h-16 flex items-center px-6 border-b border-gray-200 dark:border-gray-700 font-bold text-lg tracking-tight truncate">
+                {{ ($page.props as any).global_settings?.app_name || 'PM Control Center' }}
             </div>
             <nav class="flex-1 p-4 space-y-6 overflow-y-auto">
-
-                <!-- Render Navigasi Berdasarkan Grup -->
                 <div v-for="group in navGroups" :key="group.name">
                     <h3 class="px-3 text-xs font-bold text-gray-400 dark:text-gray-500 tracking-wider mb-2">
                         {{ group.name }}
@@ -101,28 +128,30 @@ onMounted(() => {
                     <div class="space-y-1">
                         <template v-for="item in group.items" :key="item.name">
 
-                            <!-- Link Aktif (Menggunakan URL langsung agar tidak bergantung pada Ziggy has()) -->
-                            <Link v-if="item.url" :href="item.url" :class="[
-                                $page.url.startsWith(item.url)
-                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-semibold'
-                                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium',
-                                'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm'
-                            ]">
-                                <component :is="item.icon" class="w-5 h-5 text-gray-500 dark:text-gray-400" />
-                                {{ item.name }}
-                            </Link>
+                            <!-- Render menu hanya jika user tidak punya batasan permission atau memiliki izinnya -->
+                            <div v-if="!item.permission || can(item.permission)">
+                                <!-- Link Aktif -->
+                                <Link v-if="item.url" :href="item.url" :class="[
+                                    $page.url.startsWith(item.url)
+                                        ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-semibold'
+                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium',
+                                    'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors text-sm'
+                                ]">
+                                    <component :is="item.icon" class="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                                    {{ item.name }}
+                                </Link>
 
-                            <!-- Disabled Item untuk fitur yang belum dibuat -->
-                            <div v-else
-                                class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed select-none">
-                                <component :is="item.icon" class="w-5 h-5 opacity-40" />
-                                {{ item.name }}
+                                <!-- Disabled Item -->
+                                <div v-else
+                                    class="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-600 cursor-not-allowed select-none">
+                                    <component :is="item.icon" class="w-5 h-5 opacity-40" />
+                                    {{ item.name }}
+                                </div>
                             </div>
 
                         </template>
                     </div>
                 </div>
-
             </nav>
         </aside>
 
@@ -136,7 +165,7 @@ onMounted(() => {
                 <div class="flex items-center gap-4">
                     <!-- Notification Dropdown -->
                     <NotificationDropdown />
-                    
+
                     <!-- Theme Toggle Button -->
                     <button @click="toggleTheme"
                         class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors">
@@ -178,7 +207,7 @@ onMounted(() => {
                             </Link>
                         </div>
 
-                        <!-- Overlay transparan untuk menutup dropdown saat klik di luar -->
+                        <!-- Overlay transparan -->
                         <div v-if="showDropdown" @click="showDropdown = false" class="fixed inset-0 z-40"></div>
                     </div>
                 </div>

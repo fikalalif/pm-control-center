@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 
 // Menerima data master untuk dropdown
 defineProps<{
@@ -10,8 +10,10 @@ defineProps<{
     phases: any[];
 }>();
 
+const page = usePage();
+
 const form = useForm({
-    project_code: '',
+    project_code: (page.props as any).global_settings?.project_code_prefix || 'PRJ-',
     name: '',
     client_id: '',
     project_type_id: '',

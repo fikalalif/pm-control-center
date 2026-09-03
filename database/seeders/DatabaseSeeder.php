@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Role;
+use Spatie\Permission\Models\Role;
 use App\Models\User;
 use App\Models\Client;
 use App\Models\Vendor;
@@ -15,12 +15,71 @@ use App\Models\ChangeRequest;
 use App\Models\Meeting;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use Spatie\Permission\Models\Permission;
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. Buat Roles berdasarkan spesifikasi PRD
+        // 1. Buat Permissions dulu
+        $permissions = [
+            // Project & Task (yang udah lu buat)
+            'view_projects',
+            'create_projects',
+            'edit_projects',
+            'delete_projects',
+            'view_tasks',
+            'create_tasks',
+            'edit_tasks',
+            'delete_tasks',
+
+            // Tambahan Baru: Milestones, Risks, Issues, Change Requests
+            'view_milestones',
+            'create_milestones',
+            'edit_milestones',
+            'delete_milestones',
+            'view_risks',
+            'create_risks',
+            'edit_risks',
+            'delete_risks',
+            'view_issues',
+            'create_issues',
+            'edit_issues',
+            'delete_issues',
+            'view_change_requests',
+            'create_change_requests',
+            'edit_change_requests',
+            'delete_change_requests',
+
+            // Tambahan Baru: Stakeholders (Clients, Vendors)
+            'view_clients',
+            'create_clients',
+            'edit_clients',
+            'delete_clients',
+            'view_vendors',
+            'create_vendors',
+            'edit_vendors',
+            'delete_vendors',
+
+            // Tambahan Baru: Activity & Team
+            'view_meetings',
+            'create_meetings',
+            'edit_meetings',
+            'delete_meetings',
+            'view_users',
+            'create_users',
+            'edit_users',
+            'delete_users',
+            'manage_roles' // Khusus Role & Access biasanya dibikin 1 aja biar simpel
+        ];
+
+        // ... (sisa kode looping Permission::firstOrCreate) ...
+
+        foreach ($permissions as $permission) {
+            Permission::firstOrCreate(['name' => $permission]);
+        }
+
+        // 2. Buat Roles berdasarkan spesifikasi PRD
         $roles = [
             'Admin',
             'Project Manager',
@@ -32,76 +91,91 @@ class DatabaseSeeder extends Seeder
             Role::firstOrCreate(['name' => $roleName]);
         }
 
-        // 2. Buat User dummy untuk masing-masing role
-        User::firstOrCreate(
+        foreach ($roles as $roleName) {
+            Role::firstOrCreate(['name' => $roleName]);
+        }
+
+        // 2. Buat User dummy dan langsung tembak Role pakai cara Spatie
+        $admin = User::firstOrCreate(
             ['email' => 'admin@hetra.com'],
             [
                 'name' => 'Admin System',
+                'phone' => '081234567890',
                 'password' => Hash::make('password'),
-                'role_id' => Role::where('name', 'Admin')->first()->id,
                 'is_active' => true,
             ]
         );
+        $admin->update(['phone' => '081234567890']);
+        $admin->assignRole('Admin');
 
-        User::firstOrCreate(
+        $pm = User::firstOrCreate(
             ['email' => 'pm@hetra.com'],
             [
                 'name' => 'Rett', // Product Owner / PM
+                'phone' => '081234567891',
                 'password' => Hash::make('password'),
-                'role_id' => Role::where('name', 'Project Manager')->first()->id,
                 'is_active' => true,
             ]
         );
+        $pm->update(['phone' => '081234567891']);
+        $pm->assignRole('Project Manager');
 
-        User::firstOrCreate(
+        $member = User::firstOrCreate(
             ['email' => 'fikal@hetra.com'],
             [
                 'name' => 'Fikal Alif',
+                'phone' => '081234567892',
                 'password' => Hash::make('password'),
-                'role_id' => Role::where('name', 'Project Member')->first()->id,
                 'is_active' => true,
             ]
         );
+        $member->update(['phone' => '081234567892']);
+        $member->assignRole('Project Member');
 
-        User::firstOrCreate(
+        $management = User::firstOrCreate(
             ['email' => 'management@hetra.com'],
             [
                 'name' => 'Executive Management',
+                'phone' => '081234567893',
                 'password' => Hash::make('password'),
-                'role_id' => Role::where('name', 'Management')->first()->id,
                 'is_active' => true,
             ]
         );
+        $management->update(['phone' => '081234567893']);
+        $management->assignRole('Management');
 
-        // Generate 10 additional users
-        $roles_ids = Role::pluck('id')->toArray();
+        // Update any users without phone
+        User::whereNull('phone')->each(function ($u, $idx) {
+            $u->update(['phone' => '0812345678' . str_pad((string)$idx, 2, '0', STR_PAD_LEFT)]);
+        });
+
+        // Generate 10 additional users dan assign role secara random
         User::factory(10)->create([
-            'role_id' => fn() => collect($roles_ids)->random(),
             'is_active' => true,
-        ]);
+        ])->each(function ($user) use ($roles) {
+            // Assign random role dari array $roles
+            $user->assignRole(collect($roles)->random());
+        });
 
-        // Generate Clients & Vendors
+        // Generate Clients & Vendors[cite: 3]
         Client::factory(10)->create();
         Vendor::factory(10)->create();
 
-        // Seed test notifications for admin user
-        $adminUser = User::first();
-        if ($adminUser) {
-            $adminUser->notify(new \App\Notifications\SystemNotification(
+        // Seed test notifications for admin user[cite: 3]
+        if ($admin) {
+            $admin->notify(new \App\Notifications\SystemNotification(
                 'Welcome to HETRA PM!',
                 'Your project management control center is ready to use.'
             ));
-            
-            $adminUser->notify(new \App\Notifications\SystemNotification(
+
+            $admin->notify(new \App\Notifications\SystemNotification(
                 'New Feature: Export to PDF',
                 'You can now export complete project reports directly from the Projects page.'
             ));
         }
 
-        // Generate Projects and related models
-        // Create 10 projects
+        // Generate Projects and related models[cite: 3]
         Project::factory(10)->create()->each(function ($project) {
-            // For each project, generate related records
             Task::factory(rand(5, 10))->create(['project_id' => $project->id]);
             Milestone::factory(rand(2, 5))->create(['project_id' => $project->id]);
             Risk::factory(rand(1, 3))->create(['project_id' => $project->id]);

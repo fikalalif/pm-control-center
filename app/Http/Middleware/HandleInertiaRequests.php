@@ -29,16 +29,19 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        return [
-            ...parent::share($request),
+        return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user(),
+                'roles' => $request->user() ? $request->user()->getRoleNames() : [],
+                'permissions' => $request->user() ? $request->user()->getAllPermissions()->pluck('name') : [],
             ],
+            // Pastikan flash message lu formatnya seperti ini kalau ada
             'flash' => [
-                'message' => fn() => $request->session()->get('message'),
-                // Tambahkan baris ini biar pesan error dari controller bisa nyebrang ke Vue
-                'error' => fn() => $request->session()->get('error'),
+                'message' => fn () => $request->session()->get('message'),
+                'error' => fn () => $request->session()->get('error'),
             ],
-        ];
+            // Bagikan seluruh data settings dalam bentuk key-value array
+            'global_settings' => fn () => \App\Models\Setting::pluck('value', 'key')->toArray(),
+        ]);
     }
 }
